@@ -1,0 +1,38 @@
+# -*- coding: utf-8 -*-
+
+# Define your item pipelines here
+#
+# Don't forget to add your pipeline to the ITEM_PIPELINES setting
+# See: https://doc.scrapy.org/en/latest/topics/item-pipeline.html
+from scrapy.contrib.pipeline.images import ImagesPipeline
+import os
+from scrapy.utils.project import get_project_settings
+
+
+class MyImagePipeline(ImagesPipeline):
+    def item_completed(self, results, item, info):
+        # iterate over the local file paths of all downloaded images
+        for result in [x for ok, x in results if ok]:
+            path = result['path']
+            # here we create the new path with item['name'] where the files should be in the end
+            settings = get_project_settings()
+            storage = settings.get('IMAGES_STORE')
+
+            target_path = os.path.join(storage, item['name'], os.path.basename(path))
+            path = os.path.join(storage, path)
+
+            # If path doesn't exist, it will be created
+            if not os.path.exists(os.path.join(storage, item['name'])):
+                os.makedirs(os.path.join(storage, item['name']))
+
+            # try to move the file and raise exception if not possible
+            if not os.rename(path, target_path):
+                print("Could not move image to target folder")
+
+            # here we'll write out the result with the new path,
+            # if there is a result field on the item (just like the original code does)
+            if self.IMAGES_RESULT_FIELD in item.fields:
+                result['path'] = target_path
+                # item[self.IMAGES_RESULT_FIELD].append(result)
+
+        return item
